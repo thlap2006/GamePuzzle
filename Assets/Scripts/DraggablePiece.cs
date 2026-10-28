@@ -6,6 +6,7 @@ public class DraggablePiece : MonoBehaviour
 {
     [Header("Tham chiếu hiển thị")]
     [SerializeField] private SpriteRenderer blockVisualPrefab;
+    [SerializeField] private bool useNeonStyle = true;
 
     [Header("Trải nghiệm kéo thả (UX)")]
     [SerializeField] private float trayScale = 0.6f;
@@ -14,7 +15,7 @@ public class DraggablePiece : MonoBehaviour
     public ShapeData CurrentShape { get; private set; }
 
     private PieceSpawner spawner;
-    private List<SpriteRenderer> spawnedVisuals = new List<SpriteRenderer>();
+    private List<GameObject> spawnedVisuals = new List<GameObject>();
     private Vector3 startPosition;
     private Camera mainCamera;
     private bool isDragging = false;
@@ -39,22 +40,49 @@ public class DraggablePiece : MonoBehaviour
 
     private void RebuildVisualBlocks()
     {
-        foreach (SpriteRenderer oldBlock in spawnedVisuals)
+        foreach (GameObject oldBlock in spawnedVisuals)
         {
-            if (oldBlock != null) Destroy(oldBlock.gameObject);
+            if (oldBlock != null) Destroy(oldBlock);
         }
         spawnedVisuals.Clear();
 
         float cellSize = GridManager.Instance != null ? GridManager.Instance.CellSize : 1.1f;
+        Color baseColor = CurrentShape.shapeColor;
 
         foreach (Vector2Int offset in CurrentShape.offsets)
         {
-            SpriteRenderer block = Instantiate(blockVisualPrefab, transform);
-            block.transform.localPosition = new Vector3(offset.x * cellSize, offset.y * cellSize, -1f);
-            block.color = CurrentShape.shapeColor;
-            block.sortingOrder = 10;
+            SpriteRenderer rimBlock = Instantiate(blockVisualPrefab, transform);
+            rimBlock.transform.localPosition = new Vector3(offset.x * cellSize, offset.y * cellSize, -1f);
+            rimBlock.sortingOrder = 10;
 
-            spawnedVisuals.Add(block);
+            GameObject coreObj = new GameObject("InnerCore");
+            coreObj.transform.SetParent(rimBlock.transform, false);
+            coreObj.transform.localScale = new Vector3(0.78f, 0.78f, 1f);
+            SpriteRenderer coreRenderer = coreObj.AddComponent<SpriteRenderer>();
+            coreRenderer.sprite = rimBlock.sprite;
+            coreRenderer.sortingOrder = 11;
+
+            GameObject glowObj = new GameObject("CenterGlow");
+            glowObj.transform.SetParent(rimBlock.transform, false);
+            glowObj.transform.localScale = new Vector3(0.36f, 0.36f, 1f);
+            SpriteRenderer glowRenderer = glowObj.AddComponent<SpriteRenderer>();
+            glowRenderer.sprite = rimBlock.sprite;
+            glowRenderer.sortingOrder = 12;
+
+            if (useNeonStyle)
+            {
+                rimBlock.color = Color.Lerp(baseColor, Color.white, 0.45f);
+                coreRenderer.color = Color.Lerp(baseColor, Color.black, 0.40f);
+                glowRenderer.color = Color.Lerp(baseColor, Color.white, 0.55f);
+            }
+            else
+            {
+                rimBlock.color = Color.Lerp(baseColor, Color.black, 0.45f);
+                coreRenderer.color = baseColor;
+                glowRenderer.color = Color.Lerp(baseColor, Color.white, 0.40f);
+            }
+
+            spawnedVisuals.Add(rimBlock.gameObject);
         }
     }
 
@@ -71,7 +99,11 @@ public class DraggablePiece : MonoBehaviour
     private void OnMouseDrag()
     {
         if (!isDragging) return;
+
         transform.position = GetMouseWorldPos() + dragOffset;
+
+        GridCell targetCell = GridManager.Instance.GetCellFromWorldPosition(transform.position);
+        GridManager.Instance.UpdateGhostPreview(targetCell, CurrentShape.offsets, CurrentShape.shapeColor);
     }
 
     private void OnMouseUp()
@@ -79,12 +111,13 @@ public class DraggablePiece : MonoBehaviour
         if (!isDragging) return;
         isDragging = false;
 
+        GridManager.Instance.ClearGhostPreview();
+
         GridCell targetCell = GridManager.Instance.GetCellFromWorldPosition(transform.position);
 
         if (GridManager.Instance.CanPlaceShape(targetCell, CurrentShape.offsets))
         {
             GridManager.Instance.PlaceShape(targetCell, CurrentShape.offsets, CurrentShape.shapeColor);
-
             gameObject.SetActive(false);
 
             if (spawner != null)
@@ -112,5 +145,4 @@ public class DraggablePiece : MonoBehaviour
         worldPos.z = 0f;
         return worldPos;
     }
-    
 }

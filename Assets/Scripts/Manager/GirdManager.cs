@@ -15,14 +15,16 @@ public class GridManager : MonoBehaviour
     [SerializeField] private Color primaryColor = new Color(0.85f, 0.85f, 0.85f);
     [SerializeField] private Color secondaryColor = new Color(0.75f, 0.75f, 0.75f);
 
-    public float CellSize => cellSize; 
+    public float CellSize => cellSize;
 
     private GridCell[,] gridArray;
     private Vector2 originOffset;
 
+    // Lưu danh sách các ô đang hiện bóng mờ để tắt đi cực nhanh khi di chuyển chuột
+    private List<GridCell> activePreviewCells = new List<GridCell>();
+
     private void Awake()
     {
-        
         if (Instance == null)
         {
             Instance = this;
@@ -62,28 +64,24 @@ public class GridManager : MonoBehaviour
         }
     }
 
-    
     public bool CanPlaceShape(GridCell rootCell, Vector2Int[] shapeOffsets)
     {
         if (rootCell == null) return false;
 
-        
         foreach (Vector2Int offset in shapeOffsets)
         {
             int targetX = rootCell.X + offset.x;
             int targetY = rootCell.Y + offset.y;
 
             GridCell targetCell = GetCell(targetX, targetY);
-
-            
             if (targetCell == null || targetCell.IsOccupied)
             {
                 return false;
             }
         }
-
         return true;
     }
+
     public bool CanShapeFitAnywhere(Vector2Int[] shapeOffsets)
     {
         for (int x = 0; x < width; x++)
@@ -91,19 +89,48 @@ public class GridManager : MonoBehaviour
             for (int y = 0; y < height; y++)
             {
                 GridCell cell = GetCell(x, y);
-
                 if (CanPlaceShape(cell, shapeOffsets))
                 {
                     return true;
                 }
             }
         }
-
         return false;
+    }
+
+    public void UpdateGhostPreview(GridCell rootCell, Vector2Int[] shapeOffsets, Color pieceColor)
+    {
+        ClearGhostPreview();
+
+        if (!CanPlaceShape(rootCell, shapeOffsets)) return;
+
+        foreach (Vector2Int offset in shapeOffsets)
+        {
+            GridCell cell = GetCell(rootCell.X + offset.x, rootCell.Y + offset.y);
+            if (cell != null)
+            {
+                cell.ShowPreview(pieceColor);
+                activePreviewCells.Add(cell);
+            }
+        }
+    }
+
+    public void ClearGhostPreview()
+    {
+        foreach (GridCell cell in activePreviewCells)
+        {
+            if (cell != null)
+            {
+                cell.HidePreview();
+            }
+        }
+        activePreviewCells.Clear();
     }
 
     public void PlaceShape(GridCell rootCell, Vector2Int[] shapeOffsets, Color pieceColor)
     {
+        ClearGhostPreview();
+
         foreach (Vector2Int offset in shapeOffsets)
         {
             int targetX = rootCell.X + offset.x;
@@ -121,6 +148,11 @@ public class GridManager : MonoBehaviour
         if (GameManager.Instance != null)
         {
             GameManager.Instance.AddScore(shapeOffsets.Length, linesCleared);
+        }
+
+        if (linesCleared > 0 && BoosterManager.Instance != null)
+        {
+            BoosterManager.Instance.OnLinesCleared(linesCleared);
         }
     }
 
@@ -173,7 +205,40 @@ public class GridManager : MonoBehaviour
             }
         }
 
-        return fullRows.Count + fullCols.Count; 
+        return fullRows.Count + fullCols.Count;
+    }
+    public bool SmashArea(GridCell centerCell, int radius = 1)
+    {
+        if (centerCell == null) return false;
+
+        bool anyBlockSmashed = false;
+
+        for (int dx = -radius; dx <= radius; dx++)
+        {
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                GridCell target = GetCell(centerCell.X + dx, centerCell.Y + dy);
+                if (target != null && target.IsOccupied)
+                {
+                    target.ClearBlock();
+                    anyBlockSmashed = true;
+                }
+            }
+        }
+
+        return anyBlockSmashed;
+    }
+
+    public void ClearAllCells()
+    {
+        ClearGhostPreview();
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                gridArray[x, y].ClearBlock();
+            }
+        }
     }
 
     public Vector3 GetWorldPosition(int x, int y)
@@ -197,15 +262,5 @@ public class GridManager : MonoBehaviour
             return gridArray[x, y];
         }
         return null;
-    }
-    public void ClearAllCells()
-    {
-        for (int x = 0; x < width; x++)
-        {
-            for (int y = 0; y < height; y++)
-            {
-                gridArray[x, y].ClearBlock();
-            }
-        }
     }
 }
