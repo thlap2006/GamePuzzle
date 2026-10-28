@@ -94,6 +94,8 @@ public class DraggablePiece : MonoBehaviour
         isDragging = true;
         transform.localScale = Vector3.one;
         transform.position = GetMouseWorldPos() + dragOffset;
+
+        AudioManager.Instance?.PlayPickup();
     }
 
     private void OnMouseDrag()
@@ -117,6 +119,8 @@ public class DraggablePiece : MonoBehaviour
 
         if (GridManager.Instance.CanPlaceShape(targetCell, CurrentShape.offsets))
         {
+            AudioManager.Instance?.PlayPlace();
+
             GridManager.Instance.PlaceShape(targetCell, CurrentShape.offsets, CurrentShape.shapeColor);
             gameObject.SetActive(false);
 
@@ -127,6 +131,8 @@ public class DraggablePiece : MonoBehaviour
         }
         else
         {
+            AudioManager.Instance?.PlayInvalidMove();
+
             ReturnToTray();
         }
     }

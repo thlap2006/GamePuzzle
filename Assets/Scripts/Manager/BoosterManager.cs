@@ -7,14 +7,14 @@ public class BoosterManager : MonoBehaviour
     public static BoosterManager Instance { get; private set; }
 
     [Header("Cấu hình Đồng Xu (Coins) & Giá mua Búa")]
-    [SerializeField] private int startingCoins = 100; 
-    [SerializeField] private int coinsPerLineCleared = 15; 
-    [SerializeField] private int hammerCost = 50;   
+    [SerializeField] private int startingCoins = 100;
+    [SerializeField] private int coinsPerLineCleared = 15;
+    [SerializeField] private int hammerCost = 300;
 
     [Header("Giao diện UI Xu & Búa (Từ Hyper Casual UI Pack)")]
     [SerializeField] private TextMeshProUGUI coinText;
     [SerializeField] private TextMeshProUGUI hammerCostText;
-    [SerializeField] private GameObject hammerActivePrompt; 
+    [SerializeField] private GameObject hammerActivePrompt;
 
     private int currentCoins;
     private bool isHammerMode = false;
@@ -72,6 +72,8 @@ public class BoosterManager : MonoBehaviour
         int reward = linesCount * coinsPerLineCleared;
         AddCoins(reward);
 
+        AudioManager.Instance?.PlayCoinReward();
+
         float shakeStrength = linesCount >= 2 ? 0.18f : 0.08f;
         TriggerCameraShake(0.15f, shakeStrength);
     }
@@ -91,18 +93,20 @@ public class BoosterManager : MonoBehaviour
 
         if (isHammerMode)
         {
+            AudioManager.Instance?.PlayHammerCancel();
             SetHammerMode(false);
             return;
         }
 
         if (currentCoins >= hammerCost)
         {
+            AudioManager.Instance?.PlayHammerSelect();
             SetHammerMode(true);
         }
         else
         {
+            AudioManager.Instance?.PlayNotEnoughCoins();
             Debug.Log("Không đủ Xu để dùng Búa!");
-            TriggerCameraShake(0.1f, 0.05f);
         }
     }
 
@@ -126,6 +130,8 @@ public class BoosterManager : MonoBehaviour
 
         if (clickedCell != null && GridManager.Instance.SmashArea(clickedCell, 1))
         {
+            AudioManager.Instance?.PlayHammer();
+
             AddCoins(-hammerCost);
             SetHammerMode(false);
 
